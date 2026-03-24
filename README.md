@@ -1,0 +1,2 @@
+# Adaptive-Transaction-risk-scoring-using-Unsupervised-learning
+Developed a machine learning–based transaction risk scoring system using *unsupervised learning* to detect anomalous financial transactions without relying on labeled fraud data. The system analyzes transaction behavior (amount, location, time, merchant, etc.) and assigns a *normalized risk score (0–100)* with categorized risk levels.
