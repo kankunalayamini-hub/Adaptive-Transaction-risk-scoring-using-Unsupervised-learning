@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaction Risk Predictor</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<style>
+/* Full-screen background with overlay */
+body {
+    background: url('/static/background.jpg') no-repeat center center fixed;
+    background-size: cover;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    position: relative;
+}
+body::after {
+    content: "";
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.6); /* dark overlay for contrast */
+    z-index: 0;
+}
+
+/* Cards with glassmorphism effect */
+.card {
+    border-radius: 20px;
+    backdrop-filter: blur(15px);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 1;
+}
+
+/* Card Header Gradient */
+.card-header {
+    border-radius: 20px 20px 0 0;
+    background: linear-gradient(135deg, #007bff, #00c6ff);
+    color: white;
+    font-weight: 600;
+}
+
+/* Inputs */
+.input-with-icon {
+    padding-left: 40px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    transition: all 0.3s ease;
+}
+.input-with-icon:focus {
+    border-color: #00c6ff;
+    box-shadow: 0 0 10px #00c6ff;
+    background: rgba(255,255,255,0.3);
+    color: #ffffff;
+}
+.input-with-icon::placeholder {
+    color: #ffffff;
+}
+/* Select boxes */
+select.input-with-icon {
+    color: #ffffff;
+    background: rgba(255,255,255,0.3);
+}
+
+/* Placeholder text */
+::placeholder { color: #ffffffaa; }
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+    border: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+}
+.moreleft i {
+    left: 30px;
+}
+/* Gauge Card */
+.card.text-center {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(15px);
+}
+
+/* Progress Bar */
+.progress-bar { font-weight: bold; transition: width 0.5s ease; }
+select.input-with-icon option {
+    color: #000000;
+}
+/* Live Risk Badge */
+.badge {
+    font-size: 1rem;
+    padding: 0.5em 1em;
+}
+
+/* Form Icons */
+.form-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #fff; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .gauge-container { width: 200px; }
+    .card { margin-bottom: 30px; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="container mt-5">
+
+    <div class="row">
+
+        <!-- Transaction Form -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-lg">
+                <div class="card-header text-center">
+                    <h3><i class="fas fa-credit-card"></i> Transaction Risk Predictor</h3>
+                </div>
+                <div class="card-body">
+                    <form id="txnForm" method="POST">
+                        <!-- Transaction Amount & Age -->
+                        <div class="row mb-3">
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-dollar-sign form-icon"></i>
+                                <input type="number" step="0.01" name="transaction_amount" class="form-control input-with-icon" placeholder="Transaction Amount ($)" required>
+                            </div>
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-user form-icon"></i>
+                                <input type="number" name="cardholder_age" class="form-control input-with-icon" placeholder="Cardholder Age" required>
+                            </div>
+                        </div>
+
+                        <!-- International Checkbox -->
+                        <div class="form-check mb-3 text-white">
+                            <input type="checkbox" name="is_international" class="form-check-input" id="internationalCheck">
+                            <label class="form-check-label" for="internationalCheck">International Transaction</label>
+                        </div>
+
+                        <!-- Dropdowns: Merchant, Type, Entry, City, State, Country, Currency -->
+                        <div class="row mb-3">
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-store form-icon"></i>
+                                <select name="merchant_category" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Merchant Category</option>
+                                    {% for val in dropdown_values['merchant_category'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-shopping-cart form-icon"></i>
+                                <select name="transaction_type" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Transaction Type</option>
+                                    {% for val in dropdown_values['transaction_type'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-keyboard form-icon"></i>
+                                <select name="entry_mode" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Entry Mode</option>
+                                    {% for val in dropdown_values['entry_mode'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-city form-icon"></i>
+                                <select name="transaction_city" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Transaction City</option>
+                                    {% for val in dropdown_values['transaction_city'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-map-marker-alt form-icon"></i>
+                                <select name="transaction_state" class="form-control input-with-icon">
+                                    <option value="" disabled selected>State</option>
+                                    {% for val in dropdown_values['transaction_state'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-flag form-icon"></i>
+                                <select name="transaction_country" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Country</option>
+                                    {% for val in dropdown_values['transaction_country'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-money-bill-wave form-icon"></i>
+                                <select name="currency_code" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Currency Code</option>
+                                    {% for val in dropdown_values['currency_code'] %}
+                                        <option value="{{ val }}">{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col position-relative moreleft">
+                                <i class="fas fa-venus-mars form-icon"></i>
+                                <select name="cardholder_gender" class="form-control input-with-icon" required>
+                                    <option value="" disabled selected>Cardholder Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Cardholder ID & Transaction DateTime -->
+                        <div class="mb-3 position-relative">
+                            <i class="fas fa-id-card form-icon"></i>
+                            <input type="text" name="cardholder_id" class="form-control input-with-icon" placeholder="Cardholder ID" required>
+                        </div>
+
+                        <div class="mb-3 position-relative">
+                            <i class="fas fa-calendar-alt form-icon"></i>
+                            <input type="text" name="transaction_datetime" class="form-control input-with-icon" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-rocket"></i> Predict Risk</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Risk Gauge -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-lg text-center p-4">
+                <h4 class="text-white"><i class="fas fa-tachometer-alt"></i> Live Risk Preview</h4>
+                <div class="gauge-container mt-4">
+                    <canvas id="liveGauge"></canvas>
+                </div>
+                <div class="mt-3">
+                    <h5 class="text-white">Risk Score: <span id="liveRiskScore">0%</span></h5>
+                    <div class="progress mx-auto" style="max-width: 400px;">
+                        <div id="liveProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%;">0%</div>
+                    </div>
+                    <h5 class="mt-2 text-white">Risk Level: <span id="liveRiskLevel" class="badge bg-success">Low</span></h5>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let gaugeCtx = document.getElementById('liveGauge').getContext('2d');
+let gaugeChart = new Chart(gaugeCtx, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [0, 100], backgroundColor: ['#28a745', '#e9ecef'], borderWidth: 0, cutout: '70%', rotation: 180, circumference: 180 }] },
+    options: { plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+});
+
+function updateGauge(score, color, level) {
+    gaugeChart.data.datasets[0].data = [score, 100 - score];
+    gaugeChart.data.datasets[0].backgroundColor = [color, '#e9ecef'];
+    gaugeChart.update();
+    document.getElementById('liveRiskScore').innerText = score + '%';
+    let pb = document.getElementById('liveProgressBar');
+    pb.style.width = score + '%';
+    pb.className = 'progress-bar bg-' + (color === '#28a745' ? 'success' : color === '#ffc107' ? 'warning' : 'danger');
+    pb.innerText = score + '%';
+    let badge = document.getElementById('liveRiskLevel');
+    badge.innerText = level;
+    badge.className = 'badge bg-' + (color === '#28a745' ? 'success' : color === '#ffc107' ? 'warning' : 'danger');
+}
+
+function predictLive() {
+    let formData = $('#txnForm').serialize();
+    $.post('/predict_live', formData, function(data) {
+        let score = Math.round(data.risk_score);
+        let color = data.color;
+        let level = data.risk_level;
+        updateGauge(score, color, level);
+    });
+}
+
+$('#txnForm input, #txnForm select').on('input change', predictLive);
+</script>
+</body>
+</html>
